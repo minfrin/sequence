@@ -192,7 +192,7 @@ int main (int argc, char **argv)
                 names = realloc(names, size * sizeof(const char *));
             }
 
-            names[count] = strndup(de->d_name, de->d_namlen);
+            names[count] = strdup(de->d_name);
 
             count++;
 
@@ -217,7 +217,7 @@ int main (int argc, char **argv)
                 names = realloc(names, size * sizeof(const char *));
             }
 
-            names[count] = strndup(de->d_name, de->d_namlen);
+            names[count] = strdup(de->d_name);
 
             count++;
 
