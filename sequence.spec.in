@@ -11,7 +11,8 @@ Source0:   %{URL}/releases/download/%{name}-%{version}/%{name}-%{version}.tar.gz
 BuildRequires: clang
 BuildRequires: autoconf
 BuildRequires: automake
-bUildRequires: libtool
+BuildRequires: libtool
+BuildRequires: txt2man
 
 %description
 The sequence command runs all the executables in a specified directory,
