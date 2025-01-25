@@ -1,6 +1,15 @@
 # sequence
   sequence - Run all executables in a directory in sequence.
 
+## downloads
+
+The sequence tool is available as RPMs through [COPR] as follows:
+
+```
+dnf copr enable minfrin/sequence
+dnf install sequence
+```
+
 ## synopsis
   sequence [-0] [-p] [-v] [-h] directory [options]
 
@@ -53,3 +62,4 @@
 ## author
   Graham Leggett <minfrin@sharp.fm>
 
+  [COPR]: <https://copr.fedorainfracloud.org/coprs/minfrin/sequence/>
