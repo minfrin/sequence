@@ -305,7 +305,7 @@ int main (int argc, char **argv)
                 }
 
                 /* process successful exit */
-                else if (WIFEXITED(status)) {
+                else if (WIFEXITED(status) && (WEXITSTATUS(status) == EXIT_SUCCESS)) {
 
                     /* drop through */
                 }
