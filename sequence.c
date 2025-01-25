@@ -34,6 +34,7 @@
 static struct option long_options[] =
 {
     {"zero", no_argument, NULL, '0'},
+    {"ignore", no_argument, NULL, 'i'},
     {"print", no_argument, NULL, 'p'},
     {"help", no_argument, NULL, 'h'},
     {"version", no_argument, NULL, 'v'},
@@ -66,11 +67,13 @@ static int help(const char *name, const char *msg, int code)
             "  The sequence command runs all the executables in a specified directory,\n"
             "  running each one in sequence ordered alphabetically.\n"
             "\n"
-            "  Each executable is named sensibly so it is clear which executable is\n"
-            "  responsible for output in logfiles.\n"
+            "  Each executable is named clearly in argv[0] or ${0} so it is\n"
+            "  clear which executable is responsible for output in syslog.\n"
             "\n"
             "OPTIONS\n"
             "  -0, --zero  Terminate names with a zero instead of newline.\n"
+            "\n"
+            "  -i, --ignore  Ignore non executable files. See the note below.\n"
             "\n"
             "  -p, --print  Print the name of executables rather than execute.\n"
             "\n"
@@ -87,6 +90,16 @@ static int help(const char *name, const char *msg, int code)
             "\n"
             "  If the executable could not be executed, or if the options\n"
             "  are invalid, the status 1 is returned.\n"
+            "\n"
+            "NOTES\n"
+            "  When non executable files are ignored with the -i option, sequence will\n"
+            "  ignore the EACCESS result code when trying to execute the file and move\n"
+            "  on to the next executable. When executables are listed with -p,\n"
+            "  sequence will make a 'best effort' check as to whether it is allowed\n"
+            "  to run an executable, ignoring any executables that are not regular files,\n"
+            "  and ignoring any executables that do not pass an access check. Callers are\n"
+            "  to take care using this information to ensure that race conditions and\n"
+            "  additional restrictions like selinux do not negatively affect the outcome.\n"
             "\n"
             "EXAMPLES\n"
             "  In this basic example, we execute all commands in /etc/rc3.d, passing\n"
@@ -116,7 +129,7 @@ int main (int argc, char **argv)
 {
     const char *name = argv[0];
     const char *dirname;
-    int c, status = 0, zero = 0, print = 0, dfd;
+    int c, status = 0, zero = 0, ignore = 0, print = 0, dfd;
 
     DIR *dh;
     struct dirent *de;
@@ -125,12 +138,16 @@ int main (int argc, char **argv)
 
     const char **names = malloc(sizeof(const char *) * size);
 
-    while ((c = getopt_long(argc, argv, "0phv", long_options, NULL)) != -1) {
+    while ((c = getopt_long(argc, argv, "0iphv", long_options, NULL)) != -1) {
 
         switch (c)
         {
         case '0':
             zero = 1;
+
+            break;
+        case 'i':
+            ignore = 1;
 
             break;
         case 'p':
@@ -162,20 +179,20 @@ int main (int argc, char **argv)
     if (dfd == -1) {
         fprintf(stderr, "%s: Could not open '%s': %s\n", name,
                 dirname, strerror(errno));
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (fchdir(dfd) == -1) {
         fprintf(stderr, "%s: Could not chdir to '%s': %s\n", name,
                 dirname, strerror(errno));
-        return 1;
+        return EXIT_FAILURE;
     }
 
     dh = fdopendir(dfd);
     if (!dh) {
         fprintf(stderr, "%s: Could not open directory '%s': %s\n", name,
                 dirname, strerror(errno));
-        return 1;
+        return EXIT_FAILURE;
     }
 
     while ((de = readdir(dh))){
@@ -185,48 +202,14 @@ int main (int argc, char **argv)
             continue;
         }
 
-        switch (de->d_type) {
-        case DT_REG: {
-
-            if (size <= count) {
-                size *= 2;
-                names = realloc(names, size * sizeof(const char *));
-            }
-
-            names[count] = strdup(de->d_name);
-
-            count++;
-
-            break;
+        if (size <= count) {
+            size *= 2;
+            names = realloc(names, size * sizeof(const char *));
         }
-        case DT_LNK: {
 
-            struct stat buf;
+        names[count] = strdup(de->d_name);
 
-            if (fstatat(dfd, de->d_name, &buf, 0)) {
-                fprintf(stderr, "%s: Could not stat '%s/%s': %s\n", name,
-                        dirname, de->d_name, strerror(errno));
-                return 1;
-            }
-
-            if (!S_ISREG(buf.st_mode)) {
-                continue;
-            }
-
-            if (size <= count) {
-                size *= 2;
-                names = realloc(names, size * sizeof(const char *));
-            }
-
-            names[count] = strdup(de->d_name);
-
-            count++;
-
-            break;
-        }
-        default:
-            continue;
-        }
+        count++;
     }
 
     closedir(dh);
@@ -242,6 +225,24 @@ int main (int argc, char **argv)
         argv[optind] = buf;
 
         if (print) {
+
+            if (ignore) {
+
+                struct stat buf;
+
+                if (fstatat(dfd, names[i], &buf, 0)) {
+                    continue;
+                }
+
+                if (!S_ISREG(buf.st_mode)) {
+                    continue;
+                }
+
+                if (faccessat(dfd, names[i], X_OK, AT_EACCESS)) {
+                    continue;
+                }
+
+            }
 
             if (zero) {
                 fprintf(stdout, "%s%c", buf, 0);
@@ -269,8 +270,11 @@ int main (int argc, char **argv)
             /* child */
             else if (f == 0) {
 
-
                 execv(names[i], argv + optind);
+
+                if (ignore && errno == EACCES) {
+                    return EXIT_SUCCESS;
+                }
 
                 fprintf(stderr, "%s: Could not execute '%s': %s\n", name,
                         argv[optind], strerror(errno));
