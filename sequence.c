@@ -60,7 +60,7 @@ static int help(const char *name, const char *msg, int code)
             "  %s - Run all executables in a directory in sequence.\n"
             "\n"
             "SYNOPSIS\n"
-            "  %s [-0] [-p] [-v] [-h] directory [options]\n"
+            "  %s [-0] [-i] [-p] [-v] [-h] directory [options]\n"
             "\n"
             "DESCRIPTION\n"
             "\n"
