@@ -1,6 +1,5 @@
 libtool
 sequence
-sequence.1
 sequence.spec
 
 # http://www.gnu.org/software/automake

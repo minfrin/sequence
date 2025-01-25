@@ -12,7 +12,6 @@ BuildRequires: clang
 BuildRequires: autoconf
 BuildRequires: automake
 BuildRequires: libtool
-BuildRequires: txt2man
 
 %description
 The sequence command runs all the executables in a specified directory,
