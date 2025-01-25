@@ -12,6 +12,8 @@
   Each executable is named clearly in argv[0] or ${0} so it is
   clear which executable is responsible for output in syslog.
 
+  Sequence is an alternative to the run-parts command found in cron.
+
 ## options
   -0, --zero  Terminate names with a zero instead of newline.
 

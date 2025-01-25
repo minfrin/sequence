@@ -70,6 +70,8 @@ static int help(const char *name, const char *msg, int code)
             "  Each executable is named clearly in argv[0] or ${0} so it is\n"
             "  clear which executable is responsible for output in syslog.\n"
             "\n"
+            "  Sequence is an alternative to the run-parts command found in cron.\n"
+            "\n"
             "OPTIONS\n"
             "  -0, --zero  Terminate names with a zero instead of newline.\n"
             "\n"
