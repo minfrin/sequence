@@ -8,7 +8,7 @@
 .SH SYNOPSIS
 .nf
 .fam C
-\fBsequence\fP [\fB-0\fP] [\fB-i\fP] [\fB-p\fP] [\fB-s\fP facility.level] [\fB-v\fP] [\fB-h\fP] \fIdirectory\fP [\fIoptions\fP]
+\fBsequence\fP [\fB-0\fP] [\fB-b\fP \fIdir\fP] [\fB-i\fP] [\fB-p\fP] [\fB-s\fP facility.level] [\fB-v\fP] [\fB-h\fP] \fIdirectory\fP [\fIoptions\fP]
 
 .fam T
 .fi
@@ -29,6 +29,10 @@ Sequence is an alternative to the run-parts command found in cron.
 .B
 \fB-0\fP, \fB--zero\fP
 Terminate names with a zero instead of newline.
+.TP
+.B
+\fB-b\fP, \fB--base\fP \fIdir\fP
+Directory is relative to this base \fIdirectory\fP.
 .TP
 .B
 \fB-i\fP, \fB--ignore\fP
@@ -75,11 +79,11 @@ the parameter 'start' to each command.
 .fam T
 .fi
 Here, we execute all commands in /etc/cron.d, passing stderr to syslog
-with the level 'cron' and priority 'info'.
+with the level 'cron' and priority 'info'. 'cron.d/command' will be logged.
 .PP
 .nf
 .fam C
-        ~$ sequence -s cron.info /etc/cron.d
+        ~$ sequence -s cron.info -b /etc cron.d
 
 .fam T
 .fi

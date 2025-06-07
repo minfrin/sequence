@@ -11,7 +11,7 @@ dnf install sequence
 ```
 
 ## synopsis
-  sequence [-0] [-i] [-p] [-s facility.level] [-v] [-h] directory [options]
+  sequence [-0] [-b dir] [-i] [-p] [-s facility.level] [-v] [-h] directory [options]
 
 ## description
 
@@ -26,6 +26,8 @@ dnf install sequence
 
 ## options
   -0, --zero  Terminate names with a zero instead of newline.
+
+  -b, --base dir    Directory is relative to this base directory.
 
   -i, --ignore  Ignore non executable files. See the note below.
 
@@ -64,8 +66,8 @@ dnf install sequence
 	~$ sequence /etc/rc3.d -- start
 
   Here, we execute all commands in /etc/cron.d, passing stderr to syslog
-  with the level 'cron' and priority 'info'.
-        ~$ sequence -s cron.info /etc/cron.d
+  with the level 'cron' and priority 'info'. 'cron.d/command' will be logged.
+        ~$ sequence -s cron.info -b /etc cron.d
 
 ## author
   Graham Leggett <minfrin@sharp.fm>

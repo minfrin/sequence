@@ -1,6 +1,8 @@
 
 Changes with v1.1.0
 
+  *) Add the option to specify a base directory. [Graham Leggett]
+
   *) Add syslog support. [Graham Leggett]
 
 Changes with v1.0.0

@@ -40,6 +40,7 @@
 static struct option long_options[] =
 {
     {"zero", no_argument, NULL, '0'},
+    {"base", required_argument, NULL, 'b'},
     {"ignore", no_argument, NULL, 'i'},
     {"print", no_argument, NULL, 'p'},
     {"syslog", required_argument, NULL, 's'},
@@ -67,7 +68,7 @@ static int help(const char *name, const char *msg, int code)
             "  %s - Run all executables in a directory in sequence.\n"
             "\n"
             "SYNOPSIS\n"
-            "  %s [-0] [-i] [-p] [-s facility.level] [-v] [-h] directory [options]\n"
+            "  %s [-0] [-b dir] [-i] [-p] [-s facility.level] [-v] [-h] directory [options]\n"
             "\n"
             "DESCRIPTION\n"
             "\n"
@@ -82,6 +83,8 @@ static int help(const char *name, const char *msg, int code)
             "\n"
             "OPTIONS\n"
             "  -0, --zero    Terminate names with a zero instead of newline.\n"
+            "\n"
+            "  -b, --base dir    Directory is relative to this base directory.\n"
             "\n"
             "  -i, --ignore  Ignore non executable files. See the note below.\n"
             "\n"
@@ -121,9 +124,9 @@ static int help(const char *name, const char *msg, int code)
             "\t~$ sequence /etc/rc3.d -- start\n"
             "\n"
             "  Here, we execute all commands in /etc/cron.d, passing stderr to syslog\n"
-            "  with the level 'cron' and priority 'info'.\n"
+            "  with the level 'cron' and priority 'info'. 'cron.d/command' will be logged.\n"
             "\n"
-            "\t~$ sequence -s cron.info /etc/cron.d\n"
+            "\t~$ sequence -s cron.info -b /etc cron.d\n"
             "\n"
             "AUTHOR\n"
             "  Graham Leggett <minfrin@sharp.fm>\n"
@@ -192,8 +195,9 @@ static char *syslog_details(const char *name, const CODE *codetab)
 int main (int argc, char **argv)
 {
     const char *name = argv[0];
+    const char *basename = NULL;
     const char *dirname;
-    int c, status = 0, zero = 0, ignore = 0, print = 0, slog = 0, dfd;
+    int c, status = 0, zero = 0, ignore = 0, print = 0, slog = 0, bfd, dfd;
 
     int facility = 0, level = 0;
 
@@ -204,12 +208,16 @@ int main (int argc, char **argv)
 
     const char **names = malloc(sizeof(const char *) * size);
 
-    while ((c = getopt_long(argc, argv, "0ips:hv", long_options, NULL)) != -1) {
+    while ((c = getopt_long(argc, argv, "0b:ips:hv", long_options, NULL)) != -1) {
 
         switch (c)
         {
         case '0':
             zero = 1;
+
+            break;
+        case 'b':
+            basename = optarg;
 
             break;
         case 'i':
@@ -271,6 +279,22 @@ int main (int argc, char **argv)
     if (optind == argc) {
         fprintf(stderr, "%s: No directory specified.\n", name);
         return EXIT_FAILURE;
+    }
+
+    if (basename) {
+
+        bfd = open(basename, O_RDONLY);
+        if (bfd == -1) {
+            fprintf(stderr, "%s: Could not open '%s': %s\n", name,
+                    basename, strerror(errno));
+            return EXIT_FAILURE;
+        }
+
+        if (fchdir(bfd) == -1) {
+            fprintf(stderr, "%s: Could not chdir to '%s': %s\n", name,
+                    basename, strerror(errno));
+            return EXIT_FAILURE;
+        }
     }
 
     dirname = argv[optind];
@@ -411,7 +435,7 @@ int main (int argc, char **argv)
 
                 while (1) {
 
-                    char errbuf[10];
+                    char errbuf[1024];
 
                     int i, s = 0;
 
