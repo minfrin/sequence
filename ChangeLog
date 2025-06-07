@@ -1,3 +1,8 @@
+
+Changes with v1.1.0
+
+  *) Add syslog support. [Graham Leggett]
+
 Changes with v1.0.0
 
   *) Initial release. [Graham Leggett]

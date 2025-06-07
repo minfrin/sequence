@@ -11,15 +11,16 @@ dnf install sequence
 ```
 
 ## synopsis
-  sequence [-0] [-p] [-v] [-h] directory [options]
+  sequence [-0] [-i] [-p] [-s facility.level] [-v] [-h] directory [options]
 
 ## description
 
   The sequence command runs all the executables in a specified directory,
   running each one in sequence ordered alphabetically.
 
-  Each executable is named clearly in argv[0] or ${0} so it is
-  clear which executable is responsible for output in syslog.
+  Each executable is named clearly in argv[0] or ${0}, and this
+  name is prefixed to stderr or syslog to be clear which executable is
+  responsible for output.
 
   Sequence is an alternative to the run-parts command found in cron.
 
@@ -29,6 +30,9 @@ dnf install sequence
   -i, --ignore  Ignore non executable files. See the note below.
 
   -p, --print  Print the name of executables rather than execute.
+
+  -s, --syslog [facility.]level  Send stderr to syslog at the given facility
+                                 and level. Example: user.info
 
   -h, --help  Display this help message.
 
@@ -58,6 +62,10 @@ dnf install sequence
   In this basic example, we execute all commands in /etc/rc3.d, passing
   the parameter 'start' to each command.
 	~$ sequence /etc/rc3.d -- start
+
+  Here, we execute all commands in /etc/cron.d, passing stderr to syslog
+  with the level 'cron' and priority 'info'.
+        ~$ sequence -s cron.info /etc/cron.d
 
 ## author
   Graham Leggett <minfrin@sharp.fm>

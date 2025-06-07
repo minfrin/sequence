@@ -29,13 +29,20 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 
+#define SYSLOG_NAMES 1
+#include <syslog.h>
+
 #include "config.h"
+
+#define READ_FD 0
+#define WRITE_FD 1
 
 static struct option long_options[] =
 {
     {"zero", no_argument, NULL, '0'},
     {"ignore", no_argument, NULL, 'i'},
     {"print", no_argument, NULL, 'p'},
+    {"syslog", required_argument, NULL, 's'},
     {"help", no_argument, NULL, 'h'},
     {"version", no_argument, NULL, 'v'},
     {NULL, 0, NULL, 0}
@@ -60,28 +67,32 @@ static int help(const char *name, const char *msg, int code)
             "  %s - Run all executables in a directory in sequence.\n"
             "\n"
             "SYNOPSIS\n"
-            "  %s [-0] [-i] [-p] [-v] [-h] directory [options]\n"
+            "  %s [-0] [-i] [-p] [-s facility.level] [-v] [-h] directory [options]\n"
             "\n"
             "DESCRIPTION\n"
             "\n"
             "  The sequence command runs all the executables in a specified directory,\n"
             "  running each one in sequence ordered alphabetically.\n"
             "\n"
-            "  Each executable is named clearly in argv[0] or ${0} so it is\n"
-            "  clear which executable is responsible for output in syslog.\n"
+            "  Each executable is named clearly in argv[0] or ${0}, and this\n"
+            "  name is prefixed to stderr or syslog to be clear which executable is\n"
+            "  responsible for output.\n"
             "\n"
             "  Sequence is an alternative to the run-parts command found in cron.\n"
             "\n"
             "OPTIONS\n"
-            "  -0, --zero  Terminate names with a zero instead of newline.\n"
+            "  -0, --zero    Terminate names with a zero instead of newline.\n"
             "\n"
             "  -i, --ignore  Ignore non executable files. See the note below.\n"
             "\n"
-            "  -p, --print  Print the name of executables rather than execute.\n"
+            "  -p, --print   Print the name of executables rather than execute.\n"
             "\n"
-            "  -h, --help  Display this help message.\n"
+            "  -s, --syslog [facility.]level Send stderr to syslog at the given facility\n"
+            "                                and level. Example: user.info\n"
             "\n"
-            "  -v, --version  Display the version number.\n"
+            "  -h, --help    Display this help message.\n"
+            "\n"
+            "  -v, --version Display the version number.\n"
             "\n"
             "RETURN VALUE\n"
             "  The sequence tool returns the return code from the\n"
@@ -105,9 +116,14 @@ static int help(const char *name, const char *msg, int code)
             "\n"
             "EXAMPLES\n"
             "  In this basic example, we execute all commands in /etc/rc3.d, passing\n"
-            "  the parameter 'start' to each command."
+            "  the parameter 'start' to each command.\n"
             "\n"
             "\t~$ sequence /etc/rc3.d -- start\n"
+            "\n"
+            "  Here, we execute all commands in /etc/cron.d, passing stderr to syslog\n"
+            "  with the level 'cron' and priority 'info'.\n"
+            "\n"
+            "\t~$ sequence -s cron.info /etc/cron.d\n"
             "\n"
             "AUTHOR\n"
             "  Graham Leggett <minfrin@sharp.fm>\n"
@@ -127,11 +143,59 @@ sort_strcmp(const void *p1, const void *p2)
     return strcmp(*(const char **) p1, *(const char **) p2);
 }
 
+static int syslog_decode(const char *name, const CODE *codetab)
+{
+    const CODE *c;
+
+    for (c = codetab; c->c_name; c++) {
+        if (!strcasecmp(name, c->c_name)) {
+            return (c->c_val);
+        }
+    }
+
+    return -1;
+}
+
+static char *syslog_details(const char *name, const CODE *codetab)
+{
+    const CODE *c;
+
+    size_t len = 0;
+
+    char *buf, *s;
+
+    for (c = codetab; c->c_name; c++) {
+        len += strlen(c->c_name);
+        len++;
+    }
+
+    buf = s = malloc(len + 1);
+    if (!buf) {
+        return NULL;
+    }
+
+    for (c = codetab; c->c_name; c++) {
+        if (c != codetab) {
+            strncpy(s, ",", 1);
+            s++;
+        }
+        size_t l = strlen(c->c_name);
+        strncpy(s, c->c_name, l);
+        s += l;
+    }
+
+    *s = 0;
+
+    return buf;
+}
+
 int main (int argc, char **argv)
 {
     const char *name = argv[0];
     const char *dirname;
-    int c, status = 0, zero = 0, ignore = 0, print = 0, dfd;
+    int c, status = 0, zero = 0, ignore = 0, print = 0, slog = 0, dfd;
+
+    int facility = 0, level = 0;
 
     DIR *dh;
     struct dirent *de;
@@ -140,7 +204,7 @@ int main (int argc, char **argv)
 
     const char **names = malloc(sizeof(const char *) * size);
 
-    while ((c = getopt_long(argc, argv, "0iphv", long_options, NULL)) != -1) {
+    while ((c = getopt_long(argc, argv, "0ips:hv", long_options, NULL)) != -1) {
 
         switch (c)
         {
@@ -156,6 +220,41 @@ int main (int argc, char **argv)
             print = 1;
 
             break;
+        case 's': {
+            char *s;
+
+            s = strchr(optarg, '.');
+            if (s) {
+                *s = '\0';
+
+                facility = syslog_decode(optarg, facilitynames);
+                if (facility < 0) {
+                    char *facilities = syslog_details(name, facilitynames);
+                    fprintf(stderr, "%s: Unknown facility '%s': %s\n",
+                            name, optarg, facilities);
+                    free(facilities);
+                    return EXIT_FAILURE;
+                }
+
+                optarg = ++s;
+            }
+            else {
+                facility = LOG_USER;
+            }
+
+            level = syslog_decode(optarg, prioritynames);
+            if (level < 0) {
+                char *priorities = syslog_details(name, prioritynames);
+                fprintf(stderr, "%s: Unknown priority %s: %s\n",
+                        name, optarg, priorities);
+                free(priorities);
+                return EXIT_FAILURE;
+            }
+
+            slog = 1;
+
+            break;
+        }
         case 'h':
             return help(name, NULL, 0);
 
@@ -257,7 +356,19 @@ int main (int argc, char **argv)
 
         else {
 
+            int errpair[2];
+
             pid_t w, f;
+
+            if (pipe(errpair)) {
+                fprintf(stderr, "%s: Could not create pipe: %s", name,
+                        strerror(errno));
+
+                return EXIT_FAILURE;
+            }
+
+            /* Clear any inherited settings */
+            signal(SIGCHLD, SIG_DFL);
 
             f = fork();
 
@@ -271,6 +382,10 @@ int main (int argc, char **argv)
 
             /* child */
             else if (f == 0) {
+
+                dup2(errpair[WRITE_FD], STDERR_FILENO);
+                close(errpair[READ_FD]);
+                close(errpair[WRITE_FD]);
 
                 execv(names[i], argv + optind);
 
@@ -286,6 +401,55 @@ int main (int argc, char **argv)
 
             /* parent */
             else {
+
+                /* read our child's stderr, redirect to syslog or prefix with script name */
+                close(errpair[WRITE_FD]);
+
+                if (slog) {
+                    openlog(argv[optind], LOG_PID, facility);
+                }
+
+                while (1) {
+
+                    char errbuf[10];
+
+                    int i, s = 0;
+
+                    int n = read(errpair[READ_FD], errbuf, sizeof(errbuf));
+                    if (n <= 0) {
+                        break;
+                    }
+
+                    /* syslog/prefix all LF terminated strings */
+                    for (i = 0; i < n; i++) {
+                        if (errbuf[i] == '\n') {
+                            if (slog) {
+                                syslog(level, "%.*s\n", i - s, errbuf + s);
+                            }
+                            else {
+                                fprintf(stderr, "%s: %.*s\n", argv[optind], i - s, errbuf + s);
+                            }
+                            s = i + 1;
+                        }
+                    }
+
+                    /* syslog/prefix any overflow */
+                    if (s < n) {
+                        if (slog) {
+                            syslog(level, "%.*s\n", i - s, errbuf + s);
+                        }
+                        else {
+                            fprintf(stderr, "%s: %.*s\n", argv[optind], i - s, errbuf + s);
+                        }
+                    }
+
+                }
+
+                if (slog) {
+                    closelog();
+                }
+
+                close(errpair[READ_FD]);
 
                 /* wait for the child process to be done */
                 do {
