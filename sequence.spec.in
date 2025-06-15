@@ -4,7 +4,7 @@ Name:      @PACKAGE_NAME@
 Version:   @PACKAGE_VERSION@
 Release:   1%{?dist}
 Summary:   Run all executables in a directory in sequence
-License:   ASL 2.0
+License:   Apache-2.0
 
 URL:       https://github.com/minfrin/%{name}
 Source0:   %{URL}/releases/download/%{name}-%{version}/%{name}-%{version}.tar.gz
